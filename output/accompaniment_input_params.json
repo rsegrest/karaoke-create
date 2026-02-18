@@ -1,0 +1,47 @@
+{
+    "format": "wav",
+    "lora_name_or_path": "none",
+    "lora_weight": 1.0,
+    "task": "edit",
+    "prompt": "instrumental, backing track, no vocals, karaoke version",
+    "lyrics": "",
+    "audio_duration": 201.0307156357732,
+    "infer_step": 60,
+    "guidance_scale": 15.0,
+    "scheduler_type": "euler",
+    "cfg_type": "apg",
+    "omega_scale": 10.0,
+    "guidance_interval": 0.5,
+    "guidance_interval_decay": 0.0,
+    "min_guidance_scale": 3.0,
+    "use_erg_tag": true,
+    "use_erg_lyric": true,
+    "use_erg_diffusion": true,
+    "oss_steps": [],
+    "timecosts": {
+        "preprocess": 0.27894163131713867,
+        "diffusion": 57.800175189971924,
+        "latent2audio": 2.6220459938049316
+    },
+    "actual_seeds": [
+        88661664
+    ],
+    "retake_seeds": [
+        4270203958
+    ],
+    "retake_variance": 0.5,
+    "guidance_scale_text": 0.0,
+    "guidance_scale_lyric": 0.0,
+    "repaint_start": 0,
+    "repaint_end": 0,
+    "edit_n_min": 0.0,
+    "edit_n_max": 1.0,
+    "edit_n_avg": 1,
+    "src_audio_path": "testsongs\\11_You_Decorated_My_Life_(Rerecorded).m4a",
+    "edit_target_prompt": "instrumental, backing track, no vocals, karaoke version",
+    "edit_target_lyrics": "",
+    "audio2audio_enable": false,
+    "ref_audio_strength": 0.5,
+    "ref_audio_input": null,
+    "audio_path": "output\\accompaniment.wav"
+}
