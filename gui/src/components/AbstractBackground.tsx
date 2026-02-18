@@ -1,3 +1,4 @@
+import '../karaoke.css';
 // 1. DYNAMIC BACKGROUND
 // A subtle, pulsing gradient background that moves
 export const AbstractBackground = ({ active }: { active: boolean }) => (

@@ -1,6 +1,6 @@
 import { Mic, Music, Upload } from "lucide-react";
 import { useState } from "react";
-
+import '../karaoke.css';
 // 2. SETUP SCREEN
 export const SetupScreen = ({
     onStart,

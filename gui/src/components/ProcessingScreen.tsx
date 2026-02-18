@@ -1,5 +1,7 @@
 import { Disc } from "lucide-react";
 import { useEffect } from "react";
+import '../karaoke.css';
+
 // 4. LOADING/PROCESSING SCREEN
 export const ProcessingScreen = ({ onComplete }: { onComplete: () => void }) => {
     useEffect(() => {

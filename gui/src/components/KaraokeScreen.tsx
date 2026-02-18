@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import DEMO_LYRICS from "../assets/demoLyrics";
 import { ChevronLeft, Pause, Play } from "lucide-react";
+import '../karaoke.css';
 
 // 3. KARAOKE SCREEN
 const KaraokeScreen = ({
