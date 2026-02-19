@@ -10,3 +10,4 @@ libs
 **/*/node_modules
 node_modules
 TODO.*
+**/*/__pycache__
