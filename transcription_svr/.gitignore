@@ -1,0 +1,13 @@
+.venv
+.vscode
+.env
+.env.local
+.env.production
+.env.test
+.env.test.local
+TO_REMOVE_MANUALLY.txt
+libs
+**/*/node_modules
+node_modules
+TODO.*
+**/*/__pycache__

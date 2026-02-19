@@ -9,15 +9,12 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Add separate_music to path to import separation.py
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'separate_music'))
-
-# Import AudioSeparation from separation.py
-try:
-    from separation import AudioSeparation
-except ImportError as e:
-    print(f"Error importing AudioSeparation: {e}")
-    sys.exit(1)
+# Add the temp_ace_step directory to sys.path
+# Assuming separate_music/temp_ace_step exists and we can reuse it, or we need to copy it.
+# For now, let's assume we can reference the one in separate_music if it's there, 
+# or we should probably have it in a common lib. 
+# Let's try to add the path relative to this new service.
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'separate_music', 'temp_ace_step'))
 
 # Add local FFMPEG bin to PATH
 ffmpeg_bin = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "libs", "ffmpeg_bin")
@@ -34,21 +31,50 @@ if os.path.exists(ffmpeg_bin):
 if sys.stdout:
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Global separator instance
-separator = None
+try:
+    if hasattr(torchaudio, "set_audio_backend"):
+        torchaudio.set_audio_backend("soundfile")
+        print("Set torchaudio backend to soundfile")
+except Exception as e:
+    print(f"Failed to set backend: {e}")
 
-def get_separator():
-    global separator
-    if separator is None:
+# Global handler instance
+handler = None
+
+def get_handler():
+    global handler
+    if handler is None:
         try:
-            print(f"Initializing AudioSeparation...")
-            separator = AudioSeparation()
-            print("Separator initialized successfully.")
+            from acestep.handler import AceStepHandler
+            print(f"Initializing ACE-STEP Handler (v1.5)...")
+            handler = AceStepHandler()
+            
+            # Setup paths for initialization
+            # Reusing the model path from separate_music for now
+            project_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "separate_music", "temp_ace_step")
+            config_path = "acestep-v15-turbo"
+            
+            # Initialize service
+            status, success = handler.initialize_service(
+                project_root=project_root,
+                config_path=config_path,
+                device="cuda" if torch.cuda.is_available() else "cpu",
+            )
+            
+            if not success:
+                print(f"Failed to initialize service: {status}")
+                handler = None
+            else:
+                print("Service initialized successfully.")
+                
+        except ImportError as e:
+            print(f"Error importing AceStepHandler: {e}")
+            handler = None
         except Exception as e:
             print(f"Exception during initialization: {e}")
             traceback.print_exc()
-            separator = None
-    return separator
+            handler = None
+    return handler
 
 @app.route('/separate', methods=['POST'])
 def separate_audio_endpoint():
@@ -60,105 +86,79 @@ def separate_audio_endpoint():
     if not input_path.exists():
          return jsonify({'error': f'Input file not found: {input_path}'}), 404
 
-    # Output directory shared_data/outputs/<filename_no_ext>
+    # Output directory relative to shared data or specified?
+    # Let's say we put outputs in shared_data/outputs/<filename_no_ext>
     base_filename = input_path.stem
     output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "shared_data" / "outputs" / base_filename
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    separator = get_separator()
-    if not separator:
-        return jsonify({'error': 'AudioSeparation not initialized'}), 500
+    handler = get_handler()
+    if not handler:
+        return jsonify({'error': 'ACE-STEP handler not initialized'}), 500
 
     print(f"Processing: {input_path}")
-    
-    try:
-        # separate() takes audio_path and output_dir_name (relative to "output" in original script)
-        # But we want to control exact output dir.
-        # separation.py's separate method does: output_dir = os.path.join("output", output_dir)
-        # We need to change how we call it or modify separation.py to accept absolute path.
-        # For now, let's look at separation.py again.
-        # It does:
-        # output_dir = os.path.join("output", output_dir)
-        # os.makedirs(output_dir, exist_ok=True)
-        # This forces output to be in a subdirectory "output".
-        # We can temporarily chdir or modify the class. 
-        # Modifying the class (monkey patch) or just the file is better.
-        
-        # Actually, let's just instantiate the separator and run the logic ourselves if the method is too restrictive,
-        # OR we can just pass the relative path if we run from the right CWD.
-        # Let's try to monkey patch separate_sources or just call separate with a path that works out.
-        
-        # simpler: Let's just modify separation.py to allow absolute paths if provided.
-        # But wait, I shouldn't modify existing code unless necessary.
-        
-        # Let's try to just use the class and call separate. 
-        # If I pass output_dir="foo", it goes to "output/foo".
-        # If I want it in shared_data/outputs/foo, I can't easily do it with current separation.py
-        
-        # Let's import the class and use its internal model directly, or just copy the logic.
-        # The logic is simple enough: load, resample, separate_sources, save.
-        # I'll re-implement the glue logic here to have full control over paths.
-        
-        # ... actually, separation.py is small. I can just copy the relevant parts into my service 
-        # OR I can update separation.py to be more flexible (better for codebase hygiene).
-        # Let's try to usage the existing class but be clever about CWD or just accept it goes to "output/" 
-        # and move it later.
-        
-        # Let's move the files after generation.
-        # music-separation-svr CWD is probably the root or where I run it from.
-        # If I run from project root, "output" will be created there.
-        # I can then move "output/<name>/..." to "shared_data/outputs/<name>".
-        
-        # Let's try to just run it and see where it goes, then move.
-        # separate(audio_path, output_dir_name) -> output/output_dir_name/
-        
-        target_output_subdir = base_filename
-        separator.separate(str(input_path), target_output_subdir)
-        
-        # Expected locations:
-        # output/<target_output_subdir>/vocals.wav
-        # output/<target_output_subdir>/instrumental.wav
-        
-        # Move to shared_data/outputs/<base_filename>
-        # ensure output_dir exists
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        src_dir = Path("output") / target_output_subdir
-        if src_dir.exists():
-            import shutil
-            for file_name in ["vocals.wav", "instrumental.wav"]:
-                src = src_dir / file_name
-                dst = output_dir / file_name
-                if src.exists():
-                    shutil.move(str(src), str(dst))
-            
-            # Cleanup source dir
-            # shutil.rmtree(src_dir) # Maybe keep for debugging? No, clean up.
-            try:
-                shutil.rmtree(src_dir)
-            except:
-                pass
-            
-            # Cleanup "output" dir if empty?
-            # try:
-            #     os.rmdir("output")
-            # except:
-            #     pass
+    results = {}
 
-        results = {
-            'accompaniment_file': str(output_dir / "instrumental.wav"),
-            'vocal_file': str(output_dir / "vocals.wav")
-        }
-        return jsonify(results), 200
+    def generate_and_save(prompt, filename):
+        print(f"Generating {filename} with prompt: '{prompt}'...")
+        try:
+            # Using 'repaint' task for separation/editing
+            result = handler.generate_music(
+                captions=prompt,
+                src_audio=str(input_path),
+                task_type="repaint",
+                lyrics="",
+                inference_steps=50,
+                guidance_scale=7.0,
+                audio_duration=0, # Auto-detect from source
+            )
+            
+            if result.get('success'):
+                audios = result.get('audios', [])
+                if audios:
+                    # Save the first audio result
+                    audio_data = audios[0]
+                    tensor = audio_data['tensor']
+                    sample_rate = audio_data['sample_rate']
+                    
+                    save_path = output_dir / filename
+                    
+                    # Ensure tensor is 2D [channels, samples]
+                    if tensor.dim() == 1:
+                        tensor = tensor.unsqueeze(0)
+                        
+                    # Save with soundfile
+                    import soundfile as sf
+                    audio_np = tensor.transpose(0, 1).numpy()
+                    sf.write(str(save_path), audio_np, sample_rate)
+                    print(f"Saved to: {save_path}")
+                    return str(save_path)
+                else:
+                    print("No audio generated.")
+                    return None
+            else:
+                print(f"Generation failed: {result.get('error')}")
+                return None
+                
+        except Exception:
+            traceback.print_exc()
+            return None
 
-    except Exception as e:
-        print(f"Exception during separation: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+    # Generate Instrumental (Remove Vocals)
+    print("Generating Instrumental Track...")
+    inst_path = generate_and_save("instrumental, backing track, no vocals", "accompaniment.wav")
+    results['accompaniment_file'] = inst_path
+
+    # Generate Vocals (Remove Instruments)
+    print("Generating Vocals Track...")
+    voc_path = generate_and_save("vocals only, a cappella, no instruments", "vocals.wav")
+    results['vocal_file'] = voc_path
+
+    return jsonify(results), 200
 
 def main():
     # Pre-initialize handler if possible
-    get_separator()
+    get_handler()
     app.run(debug=True, port=5002)
 
 if __name__ == "__main__":
