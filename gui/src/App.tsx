@@ -10,8 +10,8 @@ import './karaoke.css';
 // --- MAIN APP COMPONENT ---
 
 export default function App() {
-  const PROXY_SERVER_URL = import.meta.env.VITE_PROXY_SERVER_URL;
-  const [appState, setAppState] = useState('splash'); // 'splash' | 'setup' | 'repertoire' | 'processing' | 'karaoke'
+  const PROXY_SERVER_URL = import.meta.env.VITE_QUEUEING_PROXY_URL;
+  const [appState, setAppState] = useState('setup'); // 'splash' | 'setup' | 'repertoire' | 'processing' | 'karaoke'
   const [songTitle, setSongTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [isRecording, setIsRecording] = useState(false);
