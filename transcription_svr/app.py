@@ -4,6 +4,7 @@ from marshmallow import Schema, fields, ValidationError
 from pathlib import Path
 import traceback
 from transcribe import transcribe_to_structured_data
+import argparse
 
 app = Flask(__name__)
 CORS(app)
@@ -82,26 +83,6 @@ def transcribe_audio_endpoint():
         output_dir.mkdir(parents=True, exist_ok=True)
         
         src_dir = Path("output") / target_output_subdir
-        # if src_dir.exists():
-            # import shutil
-            # for file_name in ["vocals.wav", "instrumental.wav"]:
-            #     src = src_dir / file_name
-            #     dst = output_dir / file_name
-            #     if src.exists():
-            #         shutil.move(str(src), str(dst))
-            
-            # Cleanup source dir
-            # shutil.rmtree(src_dir) # Maybe keep for debugging? No, clean up.
-            # try:
-            #     shutil.rmtree(src_dir)
-            # except:
-            #     pass
-            
-            # Cleanup "output" dir if empty?
-            # try:
-            #     os.rmdir("output")
-            # except:
-            #     pass
 
         import json
         with open(json_file, 'r', encoding='utf-8') as f:
@@ -124,4 +105,10 @@ def main():
     app.run(debug=True, port=5003)
 
 if __name__ == "__main__":
+    # parser = argparse.ArgumentParser(description="Transcribe vocals to text.")
+    # parser.add_argument("--input", required=True, help="Input audio file path")
+    # parser.add_argument("--output", required=True, help="Output directory for lyrics")
+    # args = parser.parse_args()
+
+    # transcribe_audio_endpoint(args.input, args.output)
     main()

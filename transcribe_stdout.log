@@ -2,3 +2,13 @@
  * Debug mode: on
 Processing: uploads/test_integration.mp3...
 Exception during lyrics extraction: 
+Processing: uploads/real_test_file.wav...
+writing transcription: 
+
+result:
+real_test_file.wav.json
+real_test_file.wav.csv
+
+
+Processing: uploads/06_Lady_Rerecorded.m4a...
+Processing: uploads/06_Lady_Rerecorded.m4a...
