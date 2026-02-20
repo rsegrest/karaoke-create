@@ -5,20 +5,26 @@ import '../karaoke.css';
 
 // 3. KARAOKE SCREEN
 const KaraokeScreen = ({
-    file,
+    accompanymentFile,
     songTitle,
+    artist,
     isRecording,
+    audioUrl,
+    lyricsData,
     onExit
 }: {
-    file: File | null;
+    accompanymentFile: File | null;
     songTitle: string;
+    artist: string;
     isRecording: boolean;
+    audioUrl?: string;
+    lyricsData?: { time: number, text: string }[];
     onExit: () => void;
 }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [lyrics, setLyrics] = useState(DEMO_LYRICS);
+    const lyrics = lyricsData || DEMO_LYRICS;
     const [activeLineIndex, setActiveLineIndex] = useState(0);
 
     const audioRef = useRef(null);
@@ -27,12 +33,14 @@ const KaraokeScreen = ({
 
     // Load audio on mount
     useEffect(() => {
-        if (file && audioRef.current as any) {
-            const url = URL.createObjectURL(file);
+        if (accompanymentFile && audioRef.current as any) {
+            const url = URL.createObjectURL(accompanymentFile);
             (audioRef.current as any).src = url;
             return () => URL.revokeObjectURL(url);
+        } else if (audioUrl && audioRef.current as any) {
+            (audioRef.current as any).src = audioUrl;
         }
-    }, [file]);
+    }, [accompanymentFile, audioUrl]);
 
     // Sync active line index
     useEffect(() => {
@@ -112,6 +120,7 @@ const KaraokeScreen = ({
                 </button>
                 <div className="text-center">
                     <h2 className="text-2xl md:text-3xl font-bold text-white tracking-wide shadow-black drop-shadow-md">{songTitle}</h2>
+                    <p className="text-sm font-medium text-slate-300 tracking-wider shadow-black drop-shadow-sm mb-1">{artist}</p>
                     {isRecording && (
                         <div className="flex items-center justify-center gap-2 mt-1">
                             <span className="animate-pulse w-3 h-3 rounded-full bg-red-500"></span>

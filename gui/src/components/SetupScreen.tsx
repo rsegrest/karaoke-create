@@ -4,6 +4,8 @@ import '../karaoke.css';
 // 2. SETUP SCREEN
 export const SetupScreen = ({
     onStart,
+    artist,
+    setArtist,
     songTitle,
     setSongTitle,
     isRecording,
@@ -14,6 +16,8 @@ export const SetupScreen = ({
     onStart: () => void;
     songTitle: string;
     setSongTitle: (title: string) => void;
+    artist: string;
+    setArtist: (title: string) => void;
     isRecording: boolean;
     setIsRecording: (recording: boolean) => void;
     file: File | null;
@@ -125,6 +129,20 @@ export const SetupScreen = ({
                     </div>
 
                     <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-slate-400 uppercase tracking-wider">Artist</label>
+                        <input
+                            type="text"
+                            value={artist}
+                            onChange={(e) => setArtist(e.target.value)}
+                            placeholder={file ? "Enter original artist..." : "Waiting for file..."}
+                            className="bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder-slate-600"
+                        />
+                    </div>
+                </div>
+
+                {/* Settings */}
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-slate-400 uppercase tracking-wider">Options</label>
                         <div
                             className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isRecording ? 'bg-red-500/20 border-red-500/50' : 'bg-slate-900/80 border-slate-700'}`}
@@ -143,6 +161,26 @@ export const SetupScreen = ({
                             </div>
                         </div>
                     </div>
+
+                    {/* <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-slate-400 uppercase tracking-wider">Options</label>
+                        <div
+                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isRecording ? 'bg-red-500/20 border-red-500/50' : 'bg-slate-900/80 border-slate-700'}`}
+                            onClick={() => setIsRecording(!isRecording)}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-full ${isRecording ? 'bg-red-500' : 'bg-slate-700'}`}>
+                                    <Mic size={20} className="text-white" />
+                                </div>
+                                <span className={`font-medium ${isRecording ? 'text-red-400' : 'text-slate-300'}`}>
+                                    Record Performance
+                                </span>
+                            </div>
+                            <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isRecording ? 'bg-red-500' : 'bg-slate-600'}`}>
+                                <div className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${isRecording ? 'translate-x-6' : 'translate-x-0'}`} />
+                            </div>
+                        </div>
+                    </div> */}
                 </div>
 
                 {/* Action Button */}

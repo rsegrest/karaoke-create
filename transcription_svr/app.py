@@ -103,11 +103,13 @@ def transcribe_audio_endpoint():
             # except:
             #     pass
 
+        import json
+        with open(json_file, 'r', encoding='utf-8') as f:
+            lyrics_json_data = json.load(f)
+
         results = {
             'lyrics_txt': lyrics_txt,
-            'lyrics_json': json_file,
-            # 'accompaniment_file': str(output_dir / "instrumental.wav"),
-            # 'vocal_file': str(output_dir / "vocals.wav")
+            'lyrics_json': lyrics_json_data,
         }
         return jsonify(results), 200
 
