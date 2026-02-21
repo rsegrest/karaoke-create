@@ -6,7 +6,7 @@ try:
     model = Qwen3ASRModel.from_pretrained(
         "Qwen/Qwen3-ASR-1.7B",
         forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B",
-        torch_dtype=torch.float32,
+        dtype=torch.float32,
     )
     print("Model loaded.")
     print("Base model device:", model.model.device)

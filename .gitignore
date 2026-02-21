@@ -11,4 +11,5 @@ libs
 node_modules
 TODO.*
 **/*/__pycache__
-**/*/*.old
+**/*/*.old.DS_Store
+.DS_Store

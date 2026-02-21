@@ -11,3 +11,4 @@ libs
 node_modules
 TODO.*
 **/*/__pycache__
+*.old

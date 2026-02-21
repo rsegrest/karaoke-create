@@ -1,0 +1,10 @@
+[
+  {
+    "type": "sqlite",
+    "path": "/Users/ricksegrest/code/2026/karaoke-create/instance/karaoke.db"
+  },
+  {
+    "type": "sqlite",
+    "path": "/Users/ricksegrest/code/2026/karaoke-create/queueing-proxy-svr/instance/karaoke.db"
+  }
+]

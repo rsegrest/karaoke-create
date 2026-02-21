@@ -3,13 +3,14 @@ import csv
 import sys
 import torch
 from qwen_asr import Qwen3ASRModel
+from pathlib import Path
 
 # global singleton to prevent concurrent OOM crashes
 print("Initializing Qwen3 ASR Model into global memory. This may take a moment...")
 MODEL = Qwen3ASRModel.from_pretrained(
     "Qwen/Qwen3-ASR-1.7B", 
     forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B",
-    torch_dtype=torch.float32
+    dtype=torch.float32
 )
 
 # Determine the best available device (use CUDA if on an NVIDIA GPU, fallback to CPU)
@@ -30,6 +31,9 @@ def transcribe_to_structured_data(audio_file, output_name):
     print(f"Processing: {audio_file}...")
     results = MODEL.transcribe(audio_file, return_time_stamps=True)
 
+    # Create temp_output directory if it doesn't exist
+    Path("temp_output").mkdir(parents=True, exist_ok=True)
+
     # Convert results into a serializable list
     data_to_save = []
     for transcription in results:
@@ -46,22 +50,78 @@ def transcribe_to_structured_data(audio_file, output_name):
                 "end": 0.0,
                 "text": transcription.text.strip()
             })
-
-    txt_path = f"{output_name}.txt"
+    # Create text file with one line per phrase
+    txt_filename = f"{output_name}.txt"
+    txt_path = f"temp_output/{txt_filename}"
     with open(txt_path, 'w', encoding='utf-8') as f:
         lyrics_txt = ""
+        
+        # Iterate over results to align punctuation from raw transcription text with timestamps
         for transcription in results:
-            print('writing transcription: ')
-            print(transcription.text)
-            f.write(f"{transcription.text.strip()}\n")
-            lyrics_txt += transcription.text.strip() + "\n"
+            if not transcription.text:
+                continue
+                
+            raw_text = transcription.text.strip()
+            
+            # If no timestamps available, just use regex to break on punctuation
+            if transcription.time_stamps is None:
+                import re
+                lyrics_txt += re.sub(r'([,.;?!])\s+', r'\1\n', raw_text) + "\n"
+                continue
+
+            current_line = ""
+            last_end = 0.0
+            search_idx = 0
+            
+            for item in transcription.time_stamps:
+                word = item.text.strip()
+                start = item.start_time
+                end = item.end_time
+                
+                # Break phrase on long pause (> 1.0 seconds)
+                if current_line and end > 0 and (start - last_end) > 1.0:
+                    lyrics_txt += current_line.strip() + "\n"
+                    current_line = ""
+                    
+                word_idx = raw_text.find(word, search_idx)
+                punct = ""
+                if word_idx >= 0:
+                    end_of_word = word_idx + len(word)
+                    while end_of_word < len(raw_text) and raw_text[end_of_word] in ",.;?!":
+                        punct += raw_text[end_of_word]
+                        end_of_word += 1
+                    search_idx = end_of_word
+
+                if current_line:
+                    current_line += " " + word + punct
+                else:
+                    current_line += word + punct
+                    
+                last_end = end
+                
+                # Break phrase on punctuation (either extracted or intrinsic)
+                if punct or (word and word[-1] in ",.;?!"):
+                    lyrics_txt += current_line.strip() + "\n"
+                    current_line = ""
+
+            if current_line:
+                lyrics_txt += current_line.strip() + "\n"
+
+        # Clean up empty lines and trailing spaces
+        lyrics_txt = "\n".join([line.strip() for line in lyrics_txt.splitlines() if line.strip()]) + "\n"
+
+        print("writing transcription:\n" + lyrics_txt)
+        f.write(lyrics_txt)
+
     # Save to JSON
-    json_path = f"{output_name}.json"
+    json_filename = f"{output_name}.json"
+    json_path = f"temp_output/{json_filename}"
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(data_to_save, f, indent=4, ensure_ascii=False)
 
     # Save to CSV
-    csv_path = f"{output_name}.csv"
+    csv_filename = f"{output_name}.csv"
+    csv_path = f"temp_output/{csv_filename}"
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=["start", "end", "text"])
         writer.writeheader()
