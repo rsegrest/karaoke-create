@@ -12,10 +12,13 @@ MODEL = Qwen3ASRModel.from_pretrained(
     torch_dtype=torch.float32
 )
 
-# Explicitly move the inner PyTorch model and aligner to CPU
-MODEL.model.to("cpu")
-if MODEL.forced_aligner:
-    MODEL.forced_aligner.model.to("cpu")
+# Determine the best available device (use CUDA if on an NVIDIA GPU, fallback to CPU)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Move the inner PyTorch model and aligner to the selected device
+MODEL.model.to(device)
+if hasattr(MODEL, "forced_aligner") and MODEL.forced_aligner:
+    MODEL.forced_aligner.model.to(device)
 print("Model initialized successfully!")
 
 def transcribe_to_structured_data(audio_file, output_name):
