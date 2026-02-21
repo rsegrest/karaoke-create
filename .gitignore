@@ -13,3 +13,4 @@ TODO.*
 **/*/__pycache__
 **/*/*.old.DS_Store
 .DS_Store
+.DS_Store
