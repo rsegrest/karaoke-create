@@ -5,18 +5,19 @@ import time
 import subprocess
 import os
 import signal
-import dotenv
+from dotenv import load_dotenv
 import json
 import sys
 
 # Load environment variables from .env file
-dotenv.load_dotenv()
+load_dotenv()
 
 # Define the server URL
 TRANSCRIPTION_SERVER_URL = os.getenv("TRANSCRIPTION_SERVER_URL")
 
 IS_WINDOWS = sys.platform == "win32"
-VENV_PYTHON = ".venv\\Scripts\\python.exe" if IS_WINDOWS else "./.venv/bin/python"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+VENV_PYTHON = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe") if IS_WINDOWS else os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
 
 print('URLs: ', TRANSCRIPTION_SERVER_URL)
 
