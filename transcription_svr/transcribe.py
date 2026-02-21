@@ -1,21 +1,31 @@
 import json
 import csv
 import sys
+import torch
 from qwen_asr import Qwen3ASRModel
 
-# def transcribe_to_structured_data(audio_path, output_name):
+# global singleton to prevent concurrent OOM crashes
+print("Initializing Qwen3 ASR Model into global memory. This may take a moment...")
+MODEL = Qwen3ASRModel.from_pretrained(
+    "Qwen/Qwen3-ASR-1.7B", 
+    forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B",
+    torch_dtype=torch.float32
+)
+
+# Explicitly move the inner PyTorch model and aligner to CPU
+MODEL.model.to("cpu")
+if MODEL.forced_aligner:
+    MODEL.forced_aligner.model.to("cpu")
+print("Model initialized successfully!")
+
 def transcribe_to_structured_data(audio_file, output_name):
     """
     Transcribes audio using Qwen3-ASR and saves the results 
     with timestamps to both JSON and CSV files.
     """
-    # Load the model (0.6B is efficient; 1.7B is more accurate)
-    # model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-0.6B", forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B")
-    model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B", forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B")
-
     # Transcribe with the timestamp flag set to True
     print(f"Processing: {audio_file}...")
-    results = model.transcribe(audio_file, return_time_stamps=True)
+    results = MODEL.transcribe(audio_file, return_time_stamps=True)
 
     # Convert results into a serializable list
     data_to_save = []

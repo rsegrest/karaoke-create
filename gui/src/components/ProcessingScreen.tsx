@@ -1,5 +1,5 @@
 import { Disc } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import '../karaoke.css';
 
 export const ProcessingScreen = ({
@@ -15,7 +15,12 @@ export const ProcessingScreen = ({
     onComplete: (data: any) => void;
     onError: (err: string) => void;
 }) => {
+    const [statusText, setStatusText] = useState("Uploading...");
+
     useEffect(() => {
+        let isCancelled = false;
+        let pollInterval: any = null;
+
         if (!file) {
             onError("No file provided");
             return;
@@ -31,16 +36,57 @@ export const ProcessingScreen = ({
             method: 'POST',
             body: formData,
         })
-            .then(res => {
-                if (!res.ok) throw new Error("Processing failed");
+            .then(async res => {
+                if (!res.ok) {
+                    let errText = "Processing failed";
+                    try {
+                        const errObj = await res.json();
+                        if (errObj && errObj.error) errText = errObj.error;
+                    } catch (e) {
+                        // ignore JSON parse error on non-JSON 500 errors
+                    }
+                    throw new Error(errText);
+                }
                 return res.json();
             })
             .then(data => {
-                onComplete(data);
+                if (isCancelled) return;
+                const songId = data.song_id;
+
+                pollInterval = setInterval(() => {
+                    fetch(`http://localhost:5001/get_song_data?song_id=${songId}`)
+                        .then(res => res.json())
+                        .then(songData => {
+                            if (isCancelled) return;
+
+                            if (songData.status === 'done') {
+                                clearInterval(pollInterval);
+                                onComplete(songData);
+                            } else if (songData.status === 'separating') {
+                                setStatusText("Separating Vocals...");
+                            } else if (songData.status === 'transcribing') {
+                                setStatusText("Transcribing Lyrics...");
+                            } else if (songData.status.startsWith('error')) {
+                                clearInterval(pollInterval);
+                                onError(`Backend failed: ${songData.status}`);
+                            }
+                        })
+                        .catch(err => {
+                            clearInterval(pollInterval);
+                            onError("Polling error: " + err.message);
+                        });
+                }, 3000);
             })
             .catch(err => {
-                onError(err.message);
+                if (!isCancelled) {
+                    onError(err.message);
+                }
             });
+
+        return () => {
+            isCancelled = true;
+            if (pollInterval) clearInterval(pollInterval);
+        };
     }, [file, songTitle, artist, onComplete, onError]);
 
     return (
@@ -52,8 +98,8 @@ export const ProcessingScreen = ({
                     <Disc className="animate-pulse text-purple-400" size={48} />
                 </div>
             </div>
-            <h2 className="text-2xl font-bold animate-pulse mb-2">Separating Vocals...</h2>
-            <p className="text-slate-400">Syncing lyrics with AI engine</p>
+            <h2 className="text-2xl font-bold animate-pulse mb-2">{statusText}</h2>
+            <p className="text-slate-400">Syncing with AI engine</p>
         </div>
     );
 };

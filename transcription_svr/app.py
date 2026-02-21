@@ -102,7 +102,7 @@ def transcribe_audio_endpoint():
 def main():
     # Pre-initialize handler if possible
     # get_separator()
-    app.run(debug=True, port=5003)
+    app.run(debug=False, port=5003, use_reloader=False)
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser(description="Transcribe vocals to text.")

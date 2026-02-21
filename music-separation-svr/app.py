@@ -1,20 +1,11 @@
 import sys
 import os
-import argparse
-import torch
-import torchaudio
 import traceback
 from pathlib import Path
 from flask import Flask, request, jsonify
+from separation import AudioSeparation
 
 app = Flask(__name__)
-
-# Add the temp_ace_step directory to sys.path
-# Assuming separate_music/temp_ace_step exists and we can reuse it, or we need to copy it.
-# For now, let's assume we can reference the one in separate_music if it's there, 
-# or we should probably have it in a common lib. 
-# Let's try to add the path relative to this new service.
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'separate_music', 'temp_ace_step'))
 
 # Add local FFMPEG bin to PATH
 ffmpeg_bin = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "libs", "ffmpeg_bin")
@@ -31,50 +22,21 @@ if os.path.exists(ffmpeg_bin):
 if sys.stdout:
     sys.stdout.reconfigure(encoding='utf-8')
 
-try:
-    if hasattr(torchaudio, "set_audio_backend"):
-        torchaudio.set_audio_backend("soundfile")
-        print("Set torchaudio backend to soundfile")
-except Exception as e:
-    print(f"Failed to set backend: {e}")
-
 # Global handler instance
-handler = None
+separator = None
 
-def get_handler():
-    global handler
-    if handler is None:
+def get_separator():
+    global separator
+    if separator is None:
         try:
-            from acestep.handler import AceStepHandler
-            print(f"Initializing ACE-STEP Handler (v1.5)...")
-            handler = AceStepHandler()
-            
-            # Setup paths for initialization
-            # Reusing the model path from separate_music for now
-            project_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "separate_music", "temp_ace_step")
-            config_path = "acestep-v15-turbo"
-            
-            # Initialize service
-            status, success = handler.initialize_service(
-                project_root=project_root,
-                config_path=config_path,
-                device="cuda" if torch.cuda.is_available() else "cpu",
-            )
-            
-            if not success:
-                print(f"Failed to initialize service: {status}")
-                handler = None
-            else:
-                print("Service initialized successfully.")
-                
-        except ImportError as e:
-            print(f"Error importing AceStepHandler: {e}")
-            handler = None
+            print("Initializing HDEMUCS Separation Model...")
+            separator = AudioSeparation()
+            print("Service initialized successfully.")
         except Exception as e:
             print(f"Exception during initialization: {e}")
             traceback.print_exc()
-            handler = None
-    return handler
+            separator = None
+    return separator
 
 @app.route('/separate', methods=['POST'])
 def separate_audio_endpoint():
@@ -86,80 +48,55 @@ def separate_audio_endpoint():
     if not input_path.exists():
          return jsonify({'error': f'Input file not found: {input_path}'}), 404
 
-    # Output directory relative to shared data or specified?
-    # Let's say we put outputs in shared_data/outputs/<filename_no_ext>
     base_filename = input_path.stem
     output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "shared_data" / "outputs" / base_filename
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    handler = get_handler()
-    if not handler:
-        return jsonify({'error': 'ACE-STEP handler not initialized'}), 500
+    sep = get_separator()
+    if not sep:
+        return jsonify({'error': 'Separation model not initialized'}), 500
 
     print(f"Processing: {input_path}")
     results = {}
 
-    def generate_and_save(prompt, filename):
-        print(f"Generating {filename} with prompt: '{prompt}'...")
-        try:
-            # Using 'repaint' task for separation/editing
-            result = handler.generate_music(
-                captions=prompt,
-                src_audio=str(input_path),
-                task_type="repaint",
-                lyrics="",
-                inference_steps=50,
-                guidance_scale=7.0,
-                audio_duration=0, # Auto-detect from source
-            )
+    try:
+        # Override the output directory in separation.py which hardcodes "output/" prefix locally.
+        # It's better to pass the absolute path and then move them, or patch separation.py.
+        # Since we just want it to work: the model saves to `output_dir` but prefixed with "output/" inside separation.py
+        # Let's just use it as intended by separation.py
+        target_dir = base_filename
+        sep.separate(str(input_path), target_dir)
+        
+        # AudioSeparation saves to "output/{target_dir}/vocals.wav" and "output/{target_dir}/instrumental.wav"
+        # We need to move them to our shared_data output_dir
+        local_output_dir = Path("output") / target_dir
+        import shutil
+        
+        vocals_src = local_output_dir / "vocals.wav"
+        inst_src = local_output_dir / "instrumental.wav"
+        
+        vocals_dst = output_dir / "vocals.wav"
+        inst_dst = output_dir / "instrumental.wav"
+        
+        if vocals_src.exists():
+            shutil.move(str(vocals_src), str(vocals_dst))
+        if inst_src.exists():
+            shutil.move(str(inst_src), str(inst_dst))
             
-            if result.get('success'):
-                audios = result.get('audios', [])
-                if audios:
-                    # Save the first audio result
-                    audio_data = audios[0]
-                    tensor = audio_data['tensor']
-                    sample_rate = audio_data['sample_rate']
-                    
-                    save_path = output_dir / filename
-                    
-                    # Ensure tensor is 2D [channels, samples]
-                    if tensor.dim() == 1:
-                        tensor = tensor.unsqueeze(0)
-                        
-                    # Save with soundfile
-                    import soundfile as sf
-                    audio_np = tensor.transpose(0, 1).numpy()
-                    sf.write(str(save_path), audio_np, sample_rate)
-                    print(f"Saved to: {save_path}")
-                    return str(save_path)
-                else:
-                    print("No audio generated.")
-                    return None
-            else:
-                print(f"Generation failed: {result.get('error')}")
-                return None
-                
-        except Exception:
-            traceback.print_exc()
-            return None
+        results['vocal_file'] = str(vocals_dst) if vocals_dst.exists() else None
+        results['accompaniment_file'] = str(inst_dst) if inst_dst.exists() else None
+        
+        return jsonify(results), 200
 
-    # Generate Instrumental (Remove Vocals)
-    print("Generating Instrumental Track...")
-    inst_path = generate_and_save("instrumental, backing track, no vocals", "accompaniment.wav")
-    results['accompaniment_file'] = inst_path
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-    # Generate Vocals (Remove Instruments)
-    print("Generating Vocals Track...")
-    voc_path = generate_and_save("vocals only, a cappella, no instruments", "vocals.wav")
-    results['vocal_file'] = voc_path
-
-    return jsonify(results), 200
 
 def main():
     # Pre-initialize handler if possible
-    get_handler()
-    app.run(debug=True, port=5002)
+    get_separator()
+    app.run(debug=False, port=5002, use_reloader=False)
 
 if __name__ == "__main__":
     main()
