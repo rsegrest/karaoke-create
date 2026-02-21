@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DEMO_LYRICS from "../assets/demoLyrics";
 import { ChevronLeft, Pause, Play } from "lucide-react";
 import '../karaoke.css';
@@ -26,12 +26,79 @@ export const KaraokeScreen = ({
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const lyrics = lyricsData || DEMO_LYRICS;
     const [activeLineIndex, setActiveLineIndex] = useState(0);
 
     const audioRef = useRef(null);
     const scrollContainerRef = useRef(null);
     const activeLineRef = useRef(null);
+
+    // Build display lines: use lyricsText phrases (if available) with timing from lyricsData
+    // Each entry has { time, text, words: [{ text, time }] } for word-level highlighting
+    const lyrics = useMemo(() => {
+        const timingData = lyricsData || DEMO_LYRICS;
+
+        if (!lyricsText) {
+            // No phrase text — fall back to word-by-word timing data, each word as its own phrase
+            return timingData.map(entry => ({
+                time: entry.time,
+                text: entry.text,
+                words: [{ text: entry.text, time: entry.time }]
+            }));
+        }
+
+        const phraseLines = lyricsText.split('\n').filter(line => line.trim());
+
+        // Walk through the word-level timing data to assign timings to each phrase and its words
+        let wordIdx = 0;
+        return phraseLines.map(line => {
+            const trimmedLine = line.trim();
+            // Split line into display words (preserving punctuation attached to words)
+            const displayWords = trimmedLine.split(/\s+/).filter(w => w);
+
+            // Match each display word to its timing entry
+            const words: { text: string; time: number }[] = [];
+            let phraseTime = wordIdx < timingData.length ? timingData[wordIdx].time : 0;
+            let foundFirst = false;
+
+            for (const dw of displayWords) {
+                const cleanDW = dw.replace(/[,.;?!]/g, '').toLowerCase();
+                let matched = false;
+                for (let i = wordIdx; i < timingData.length; i++) {
+                    const entryWord = timingData[i].text.replace(/[,.;?!]/g, '').toLowerCase();
+                    if (entryWord === cleanDW) {
+                        if (!foundFirst) {
+                            phraseTime = timingData[i].time;
+                            foundFirst = true;
+                        }
+                        words.push({ text: dw, time: timingData[i].time });
+                        wordIdx = i + 1;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    // No timing match found — use last known time
+                    words.push({ text: dw, time: words.length > 0 ? words[words.length - 1].time : phraseTime });
+                }
+            }
+
+            return { time: phraseTime, text: trimmedLine, words };
+        });
+    }, [lyricsText, lyricsData]);
+
+    // Determine the currently active word index within lyricsData based on currentTime
+    const activeWordTime = useMemo(() => {
+        const timingData = lyricsData || DEMO_LYRICS;
+        // Find the last word whose time <= currentTime
+        let lastTime = -1;
+        for (let i = timingData.length - 1; i >= 0; i--) {
+            if (currentTime >= timingData[i].time) {
+                lastTime = timingData[i].time;
+                break;
+            }
+        }
+        return lastTime;
+    }, [currentTime, lyricsData]);
 
     // Load audio on mount
     useEffect(() => {
@@ -159,7 +226,29 @@ export const KaraokeScreen = ({
                                 <p className={`font-bold font-sans tracking-tight leading-tight transition-colors duration-300
                     ${isActive ? 'text-4xl md:text-6xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'text-2xl md:text-4xl text-slate-400'}
                 `}>
-                                    {line.text}
+                                    {isActive && line.words ? (
+                                        line.words.map((word, wIdx) => {
+                                            const isWordActive = activeWordTime >= word.time &&
+                                                (wIdx === line.words.length - 1 || activeWordTime < line.words[wIdx + 1].time);
+                                            const isWordPast = activeWordTime > word.time &&
+                                                wIdx < line.words.length - 1 && activeWordTime >= line.words[wIdx + 1].time;
+                                            return (
+                                                <span
+                                                    key={wIdx}
+                                                    className={`transition-colors duration-150 ${isWordActive
+                                                            ? 'text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)]'
+                                                            : isWordPast
+                                                                ? 'text-slate-300'
+                                                                : 'text-white'
+                                                        }`}
+                                                >
+                                                    {word.text}{wIdx < line.words.length - 1 ? ' ' : ''}
+                                                </span>
+                                            );
+                                        })
+                                    ) : (
+                                        line.text
+                                    )}
                                 </p>
                             </div>
                         );

@@ -33,6 +33,9 @@ export default function App() {
       }));
       setLyricsData(mappedLyrics);
     }
+    if (data.lyrics_text) {
+      setLyricsText(data.lyrics_text);
+    }
     setAudioUrl(`${PROXY_SERVER_URL}/stream_audio?song_id=${data.song_id}&type=instrumental`);
     setFile(null); // Clear raw file, we will use the processed audioUrl!
     setAppState('karaoke');
@@ -74,6 +77,11 @@ export default function App() {
         setLyricsData(mappedLyrics);
       } else {
         setLyricsData(null);
+      }
+      if (data.lyrics_text) {
+        setLyricsText(data.lyrics_text);
+      } else {
+        setLyricsText(null);
       }
       setFile(null); // Clear file so it prefers audioUrl
       setAppState('karaoke');
