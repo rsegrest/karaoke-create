@@ -16,8 +16,9 @@ export default function App() {
   const [artist, setArtist] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [file, setFile] = useState(null);
-  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
-  const [lyricsData, setLyricsData] = useState<{ time: number, text: string }[] | undefined>(undefined);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [lyricsData, setLyricsData] = useState<{ time: number, text: string }[] | null>(null);
+  const [lyricsText, setLyricsText] = useState<string | null>(null);
 
   const startProcessing = () => {
     setAppState('processing');
@@ -47,8 +48,9 @@ export default function App() {
       return;
     }
     setFile(null);
-    setAudioUrl(undefined);
-    setLyricsData(undefined);
+    setAudioUrl(null);
+    setLyricsData(null);
+    setLyricsText(null);
     setSongTitle('');
     setIsRecording(false);
     setAppState('splash');
@@ -71,7 +73,7 @@ export default function App() {
         }));
         setLyricsData(mappedLyrics);
       } else {
-        setLyricsData(undefined);
+        setLyricsData(null);
       }
       setFile(null); // Clear file so it prefers audioUrl
       setAppState('karaoke');
@@ -134,6 +136,7 @@ export default function App() {
           accompanymentFile={file}
           audioUrl={audioUrl}
           lyricsData={lyricsData}
+          lyricsText={lyricsText}
           songTitle={songTitle || "Unknown Track"}
           artist={artist || "Unknown Artist"}
           isRecording={isRecording}

@@ -180,7 +180,7 @@ def list_available_songs():
 def get_song_data():
     song_id = request.args.get('song_id')
     song = output_manager.get_song_data(song_id)
-    return jsonify({'song_id': song.id, 'song_title': song.title, 'original_artist': song.artist, 'status': song.status, 'owner_id': getattr(song, 'owner_id', None), 'lyrics_json': song.lyrics_json})
+    return jsonify({'song_id': song.id, 'song_title': song.title, 'original_artist': song.artist, 'status': song.status, 'owner_id': getattr(song, 'owner_id', None), 'lyrics_json': song.lyrics_json, 'lyrics_text': song.lyrics_text})
 
 @app.route('/stream_audio')
 def stream_audio():

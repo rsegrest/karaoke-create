@@ -4,21 +4,23 @@ import { ChevronLeft, Pause, Play } from "lucide-react";
 import '../karaoke.css';
 
 // 3. KARAOKE SCREEN
-const KaraokeScreen = ({
+export const KaraokeScreen = ({
     accompanymentFile,
     songTitle,
     artist,
     isRecording,
     audioUrl,
     lyricsData,
+    lyricsText,
     onExit
 }: {
     accompanymentFile: File | null;
-    songTitle: string;
-    artist: string;
+    songTitle: string | null;
+    artist: string | null;
     isRecording: boolean;
-    audioUrl?: string;
-    lyricsData?: { time: number, text: string }[];
+    audioUrl?: string | null;
+    lyricsData?: { time: number, text: string }[] | null;
+    lyricsText?: string | null;
     onExit: () => void;
 }) => {
     const [isPlaying, setIsPlaying] = useState(false);
