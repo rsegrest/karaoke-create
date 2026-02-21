@@ -18,13 +18,38 @@ MUSIC_SEPARATION_SERVER_URL = os.getenv("MUSIC_SEPARATION_SERVER_URL")
 TRANSCRIPTION_SERVER_URL = os.getenv("TRANSCRIPTION_SERVER_URL")
 GUI_URL = os.getenv("GUI_URL")
 
+IS_WINDOWS = sys.platform == "win32"
+VENV_PYTHON = ".venv\\Scripts\\python.exe" if IS_WINDOWS else "./.venv/bin/python"
+
+print('URLs: ', PROXY_SERVER_URL, MUSIC_SEPARATION_SERVER_URL, TRANSCRIPTION_SERVER_URL, GUI_URL)
+
+def _popen_kwargs():
+    """Returns platform-specific kwargs for subprocess.Popen to create a new process group."""
+    if IS_WINDOWS:
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    else:
+        return {"preexec_fn": os.setsid}
+
+def _stop_process(process, name):
+    """Stops a subprocess in a cross-platform way."""
+    print(f"Stopping {name}...")
+    if not process:
+        return
+    try:
+        if IS_WINDOWS:
+            process.terminate()
+        else:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+    except (ProcessLookupError, OSError):
+        print(f"{name} process already stopped.")
+
 def start_queueing_proxy_server():
     """Starts the Flask server in a subprocess."""
     print("Starting Queueing Proxy server...")
     process = subprocess.Popen(
-        ["./.venv/bin/python", "app.py"],
+        [VENV_PYTHON, "app.py"],
         cwd="queueing-proxy-svr",
-        preexec_fn=os.setsid # Create a new session group
+        **_popen_kwargs()
     )
     time.sleep(3) # Give server time to start
     return process
@@ -33,9 +58,9 @@ def start_music_separation_server():
     """Starts the music separation server in a subprocess."""
     print("Starting music separation server...")
     process = subprocess.Popen(
-        ["./.venv/bin/python", "app.py"],
+        [VENV_PYTHON, "app.py"],
         cwd="music-separation-svr",
-        preexec_fn=os.setsid # Create a new session group
+        **_popen_kwargs()
     )
     time.sleep(3) # Give server time to start
     return process
@@ -44,9 +69,9 @@ def start_transcription_server():
     """Starts the transcription server in a subprocess."""
     print("Starting transcription server...")
     process = subprocess.Popen(
-        ["./.venv/bin/python", "app.py"],
+        [VENV_PYTHON, "app.py"],
         cwd="transcription_svr",
-        preexec_fn=os.setsid # Create a new session group
+        **_popen_kwargs()
     )
     time.sleep(3) # Give server time to start
     return process
@@ -54,49 +79,16 @@ def start_transcription_server():
 def start_gui():
     """Starts the GUI in a subprocess."""
     print("Starting GUI...")
+    kwargs = _popen_kwargs()
+    if IS_WINDOWS:
+        kwargs["shell"] = True  # yarn is a .cmd script on Windows
     process = subprocess.Popen(
         ["yarn", "start"],
         cwd="gui",
-        preexec_fn=os.setsid # Create a new session group
+        **kwargs
     )
     time.sleep(3) # Give server time to start
     return process
-
-def stop_queueing_proxy_server(process):
-    """Stops the Queueing Proxy server."""
-    print("Stopping Queueing Proxy server...")
-    if process:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        except ProcessLookupError:
-            print("Queueing Proxy server process already stopped.")
-
-def stop_music_separation_server(process):
-    """Stops the music separation server."""
-    print("Stopping music separation server...")
-    if process:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        except ProcessLookupError:
-            print("Music separation server process already stopped.")
-
-def stop_transcription_server(process):
-    """Stops the transcription server."""
-    print("Stopping transcription server...")
-    if process:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        except ProcessLookupError:
-            print("Transcription server process already stopped.")
-
-def stop_gui(process):
-    """Stops the GUI."""
-    print("Stopping GUI...")
-    if process:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        except ProcessLookupError:
-            print("GUI process already stopped.")
 
 def main():
     queueing_proxy_server_process = None
@@ -126,10 +118,10 @@ def main():
         gui_process = start_gui()
 
     input("Press Enter to stop all servers...")
-    stop_queueing_proxy_server(queueing_proxy_server_process)
-    stop_music_separation_server(music_separation_server_process)
-    stop_transcription_server(transcription_server_process)
-    stop_gui(gui_process)
+    _stop_process(queueing_proxy_server_process, "Queueing Proxy server")
+    _stop_process(music_separation_server_process, "Music separation server")
+    _stop_process(transcription_server_process, "Transcription server")
+    _stop_process(gui_process, "GUI")
 
 if __name__ == "__main__":
     main()

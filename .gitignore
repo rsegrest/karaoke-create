@@ -5,12 +5,10 @@
 .env.production
 .env.test
 .env.test.local
-TO_REMOVE_MANUALLY.txt
 libs
 **/*/node_modules
 node_modules
 TODO.*
 **/*/__pycache__
-**/*/*.old.DS_Store
-.DS_Store
-.DS_Store
+**/*/*.old
+**/*.DS_Store
