@@ -57,7 +57,7 @@ class OutputManager:
     def update_vocal_file_path(self, song_id, vocal_file_path):
         song = Song.query.get(song_id)
         if song:
-            song.vocal_file_path = vocal_file_path
+            song.vocals_file_path = vocal_file_path
             db.session.commit()
         return song
         

@@ -66,7 +66,7 @@ class AudioSeparation:
             return
 
         # Prepare final output directory
-        final_out_dir = os.path.join("output", output_dir_name)
+        final_out_dir = output_dir_name
         os.makedirs(final_out_dir, exist_ok=True)
 
         # Move vocals.wav and no_vocals.wav to the target directory

@@ -34,8 +34,47 @@ def usage():
 import requests
 import os
 import threading
+import tempfile
+from mutagen import File as MutagenFile
 
-def process_song_async(app_context, song_id, save_path, filename, mimetype):
+@app.route('/extract_metadata', methods=['POST'])
+def extract_metadata():
+    """Extract title and artist metadata from an uploaded audio file."""
+    if 'music_file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['music_file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    # Save to a temp file so mutagen can read it
+    suffix = os.path.splitext(file.filename)[1] or '.mp3'
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        file.save(tmp.name)
+        tmp.close()
+
+        audio = MutagenFile(tmp.name, easy=True)
+        title = None
+        artist = None
+
+        if audio is not None and audio.tags is not None:
+            title = audio.tags.get('title', [None])[0]
+            artist = audio.tags.get('artist', [None])[0]
+
+        return jsonify({
+            'title': title,
+            'artist': artist,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+def process_song_async(app_context, song_id, save_path, filename, mimetype, output_dir):
     with app_context:
         # Call Music Separation Service
         separation_service_url = "http://localhost:5002/separate"
@@ -46,7 +85,7 @@ def process_song_async(app_context, song_id, save_path, filename, mimetype):
         
         try:
             print(f"Calling separation service for {save_path}...")
-            response = requests.post(separation_service_url, json={'input_path': save_path})
+            response = requests.post(separation_service_url, json={'input_path': save_path, 'output_dir': output_dir})
             if response.status_code == 200:
                 separation_results = response.json()
                 accompanyment_file = separation_results.get('accompaniment_file')
@@ -78,7 +117,7 @@ def process_song_async(app_context, song_id, save_path, filename, mimetype):
             print(f"Calling transcription service...")
             with open(save_path, 'rb') as f:
                 files={'music_file': (filename, f, mimetype)}
-                response = requests.post(transcription_service_url, files=files)
+                response = requests.post(transcription_service_url, data={'output_dir': output_dir}, files=files)
             if response.status_code == 200:
                 transcription_results = response.json()
                 lyrics_txt = transcription_results.get('lyrics_txt')
@@ -110,6 +149,19 @@ def queue_request():
     except ValidationError as err:
         return jsonify(err.messages), 400
 
+    # Create DB Entry first to get song_id
+    song_title = result['song_title']
+    original_artist = result['original_artist']
+    performer_name = result['performer_name']
+    
+    new_song = output_manager.add_song_data(
+        title=song_title,
+        artist=original_artist,
+        original_file_path=""  # Placeholder, will update shortly
+    )
+    song_id = new_song.id
+    print(f"Created song entry ID: {song_id}")
+
     # Validate file presence
     if 'music_file' not in request.files:
         return jsonify({'music_file': ['Missing data for required field.']}), 400
@@ -118,18 +170,20 @@ def queue_request():
     if file.filename == '':
         return jsonify({'music_file': ['No selected file.']}), 400
 
-    # Save file to shared uploads directory
-    shared_uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'shared_data', 'uploads')
-    os.makedirs(shared_uploads_dir, exist_ok=True)
-    
+    # Save file to shared_data/outputs/<song_id>
     from werkzeug.utils import secure_filename
     filename = secure_filename(file.filename)
-    save_path = os.path.join(shared_uploads_dir, filename)
+    
+    output_dir_parent = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'shared_data', 'outputs')
+    output_dir = os.path.join(output_dir_parent, str(song_id))
+    os.makedirs(output_dir, exist_ok=True)
+    
+    save_path = os.path.join(output_dir, filename)
     file.save(save_path)
 
-    # Convert to WAV for ML model compatibility (avoid soundfile errors on .m4a)
+    # Convert to WAV for ML model compatibility
     import subprocess
-    wav_path = os.path.join(shared_uploads_dir, os.path.splitext(filename)[0] + ".wav")
+    wav_path = os.path.join(output_dir, os.path.splitext(filename)[0] + ".wav")
     if not filename.lower().endswith('.wav'):
         print(f"Converting {filename} to .wav for ML compatibility...")
         try:
@@ -140,23 +194,13 @@ def queue_request():
         except Exception as e:
             print(f"FFMPEG conversion failed: {e}")
 
-    # Create DB Entry
-    song_title = result['song_title']
-    original_artist = result['original_artist']
-    performer_name = result['performer_name']
-    
-    new_song = output_manager.add_song_data(
-        title=song_title,
-        artist=original_artist,
-        original_file_path=save_path
-    )
-    song_id = new_song.id
-    print(f"Created song entry ID: {song_id}")
+    # Update original_file_path with actual save_path
+    output_manager.update_original_file_path(song_id, save_path)
 
     # Start ML processing in a background thread so we don't block the UI
     thread = threading.Thread(
         target=process_song_async, 
-        args=(app.app_context(), song_id, save_path, filename, file.mimetype)
+        args=(app.app_context(), song_id, save_path, filename, file.mimetype, output_dir)
     )
     thread.daemon = True
     thread.start()

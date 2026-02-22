@@ -1,0 +1,30 @@
+{
+    "venvPath": "C:/Users/rsegr/Code/2026/karaoke-create",
+    "venv": ".venv",
+    "executionEnvironments": [
+        {
+            "root": "music-separation-svr",
+            "extraPaths": [
+                "."
+            ]
+        },
+        {
+            "root": "queueing-proxy-svr",
+            "extraPaths": [
+                "."
+            ]
+        },
+        {
+            "root": "transcription_svr",
+            "extraPaths": [
+                "."
+            ]
+        },
+        {
+            "root": "scripts",
+            "extraPaths": [
+                "."
+            ]
+        }
+    ]
+}

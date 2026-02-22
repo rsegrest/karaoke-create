@@ -43,13 +43,15 @@ def separate_audio_endpoint():
     data = request.get_json()
     if not data or 'input_path' not in data:
         return jsonify({'error': 'Missing input_path'}), 400
+    if 'output_dir' not in data:
+        return jsonify({'error': 'Missing output_dir'}), 400
     
     input_path = Path(data['input_path'])
     if not input_path.exists():
          return jsonify({'error': f'Input file not found: {input_path}'}), 404
 
     base_filename = input_path.stem
-    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "shared_data" / "outputs" / base_filename
+    output_dir = Path(data['output_dir'])
     output_dir.mkdir(parents=True, exist_ok=True)
 
     sep = get_separator()
@@ -60,28 +62,12 @@ def separate_audio_endpoint():
     results = {}
 
     try:
-        # Override the output directory in separation.py which hardcodes "output/" prefix locally.
-        # It's better to pass the absolute path and then move them, or patch separation.py.
-        # Since we just want it to work: the model saves to `output_dir` but prefixed with "output/" inside separation.py
-        # Let's just use it as intended by separation.py
-        target_dir = base_filename
-        sep.separate(str(input_path), target_dir)
+        # Pass the output_dir directly.
+        sep.separate(str(input_path), str(output_dir))
         
-        # AudioSeparation saves to "output/{target_dir}/vocals.wav" and "output/{target_dir}/instrumental.wav"
-        # We need to move them to our shared_data output_dir
-        local_output_dir = Path("output") / target_dir
-        import shutil
-        
-        vocals_src = local_output_dir / "vocals.wav"
-        inst_src = local_output_dir / "instrumental.wav"
-        
+        # AudioSeparation saves directly to the passed output_dir now.
         vocals_dst = output_dir / "vocals.wav"
         inst_dst = output_dir / "instrumental.wav"
-        
-        if vocals_src.exists():
-            shutil.move(str(vocals_src), str(vocals_dst))
-        if inst_src.exists():
-            shutil.move(str(inst_src), str(inst_dst))
             
         results['vocal_file'] = str(vocals_dst) if vocals_dst.exists() else None
         results['accompaniment_file'] = str(inst_dst) if inst_dst.exists() else None

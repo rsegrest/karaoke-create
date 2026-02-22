@@ -24,6 +24,35 @@ export const SetupScreen = ({
     setFile: (file: any) => void;
 }) => {
     const [isDragging, setIsDragging] = useState(false);
+    const PROXY_SERVER_URL = import.meta.env.VITE_QUEUEING_PROXY_URL;
+
+    const extractMetadata = async (audioFile: File) => {
+        // Always set filename as immediate fallback
+        const filenameFallback = audioFile.name.replace(/\.[^/.]+$/, "");
+        setSongTitle(filenameFallback);
+
+        try {
+            const formData = new FormData();
+            formData.append('music_file', audioFile);
+
+            const response = await fetch(`${PROXY_SERVER_URL}/extract_metadata`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.title) {
+                    setSongTitle(data.title);
+                }
+                if (data.artist) {
+                    setArtist(data.artist);
+                }
+            }
+        } catch (err) {
+            console.warn('Metadata extraction failed, using filename:', err);
+        }
+    };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -41,10 +70,7 @@ export const SetupScreen = ({
             const droppedFile = e.dataTransfer.files[0];
             if (droppedFile.type.startsWith('audio/')) {
                 setFile(droppedFile);
-                if (!songTitle) {
-                    // Remove extension for title
-                    setSongTitle(droppedFile.name.replace(/\.[^/.]+$/, ""));
-                }
+                extractMetadata(droppedFile);
             } else {
                 alert("Please upload an audio file.");
             }
@@ -55,9 +81,7 @@ export const SetupScreen = ({
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
             setFile(selectedFile);
-            if (!songTitle) {
-                setSongTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
-            }
+            extractMetadata(selectedFile);
         }
     };
 
@@ -65,7 +89,7 @@ export const SetupScreen = ({
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6 text-white w-full max-w-4xl mx-auto">
             <div className="mb-8 text-center">
                 <h1 className="text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-400 mb-2">
-                    KaraokeFlow
+                    KaraokeCreate
                 </h1>
                 <p className="text-slate-400 text-lg">AI-Powered Vocal Removal & Lyrics</p>
             </div>

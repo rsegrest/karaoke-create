@@ -1,5 +1,5 @@
 import { Disc } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import '../karaoke.css';
 
 export const ProcessingScreen = ({
@@ -16,10 +16,14 @@ export const ProcessingScreen = ({
     onError: (err: string) => void;
 }) => {
     const [statusText, setStatusText] = useState("Uploading...");
+    const hasStarted = useRef(false);
 
     useEffect(() => {
         let isCancelled = false;
         let pollInterval: any = null;
+
+        if (hasStarted.current) return;
+        hasStarted.current = true;
 
         if (!file) {
             onError("No file provided");

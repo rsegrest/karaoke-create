@@ -28,9 +28,47 @@ export const KaraokeScreen = ({
     const [duration, setDuration] = useState(0);
     const [activeLineIndex, setActiveLineIndex] = useState(0);
 
-    const audioRef = useRef(null);
-    const scrollContainerRef = useRef(null);
-    const activeLineRef = useRef(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const activeLineRef = useRef<HTMLDivElement>(null);
+
+    const [micStream, setMicStream] = useState<MediaStream | null>(null);
+    const micAudioRef = useRef<HTMLAudioElement>(null);
+
+    // Microphone setup
+    useEffect(() => {
+        let activeStream: MediaStream | null = null;
+
+        if (isRecording) {
+            navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true, // Prevents crazy feedback when singing into speakers
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                }
+            })
+                .then(stream => {
+                    activeStream = stream;
+                    setMicStream(stream);
+                })
+                .catch(err => {
+                    console.error("Microphone access denied or error:", err);
+                });
+        }
+
+        return () => {
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [isRecording]);
+
+    // Attach stream to audio element
+    useEffect(() => {
+        if (micAudioRef.current && micStream) {
+            micAudioRef.current.srcObject = micStream;
+        }
+    }, [micStream]);
 
     // Build display lines: use lyricsText phrases (if available) with timing from lyricsData
     // Each entry has { time, text, words: [{ text, time }] } for word-level highlighting
@@ -179,6 +217,15 @@ export const KaraokeScreen = ({
                 onEnded={() => setIsPlaying(false)}
             />
 
+            {/* Mic Playback Element (Hidden) */}
+            {isRecording && (
+                <audio
+                    ref={micAudioRef}
+                    autoPlay
+                    muted={false} // Hear through speakers!
+                />
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between p-6 bg-gradient-to-b from-black/80 to-transparent">
                 <button
@@ -236,10 +283,10 @@ export const KaraokeScreen = ({
                                                 <span
                                                     key={wIdx}
                                                     className={`transition-colors duration-150 ${isWordActive
-                                                            ? 'text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)]'
-                                                            : isWordPast
-                                                                ? 'text-slate-300'
-                                                                : 'text-white'
+                                                        ? 'text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)]'
+                                                        : isWordPast
+                                                            ? 'text-slate-300'
+                                                            : 'text-white'
                                                         }`}
                                                 >
                                                     {word.text}{wIdx < line.words.length - 1 ? ' ' : ''}

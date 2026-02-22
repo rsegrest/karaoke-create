@@ -22,7 +22,7 @@ if hasattr(MODEL, "forced_aligner") and MODEL.forced_aligner:
     MODEL.forced_aligner.model.to(device)
 print("Model initialized successfully!")
 
-def transcribe_to_structured_data(audio_file, output_name):
+def transcribe_to_structured_data(audio_file, output_dir, output_name):
     """
     Transcribes audio using Qwen3-ASR and saves the results 
     with timestamps to both JSON and CSV files.
@@ -30,9 +30,6 @@ def transcribe_to_structured_data(audio_file, output_name):
     # Transcribe with the timestamp flag set to True
     print(f"Processing: {audio_file}...")
     results = MODEL.transcribe(audio_file, return_time_stamps=True)
-
-    # Create temp_output directory if it doesn't exist
-    Path("temp_output").mkdir(parents=True, exist_ok=True)
 
     # Convert results into a serializable list
     data_to_save = []
@@ -52,7 +49,7 @@ def transcribe_to_structured_data(audio_file, output_name):
             })
     # Create text file with one line per phrase
     txt_filename = f"{output_name}.txt"
-    txt_path = f"temp_output/{txt_filename}"
+    txt_path = Path(output_dir) / txt_filename
     with open(txt_path, 'w', encoding='utf-8') as f:
         lyrics_txt = ""
         
@@ -115,23 +112,25 @@ def transcribe_to_structured_data(audio_file, output_name):
 
     # Save to JSON
     json_filename = f"{output_name}.json"
-    json_path = f"temp_output/{json_filename}"
+    json_path = Path(output_dir) / json_filename
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(data_to_save, f, indent=4, ensure_ascii=False)
 
     # Save to CSV
     csv_filename = f"{output_name}.csv"
-    csv_path = f"temp_output/{csv_filename}"
+    csv_path = Path(output_dir) / csv_filename
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=["start", "end", "text"])
         writer.writeheader()
         writer.writerows(data_to_save)
 
-    return json_path, csv_path, lyrics_txt
+    return str(json_path), str(csv_path), lyrics_txt
 
 if __name__ == "__main__":
-    # Usage: python script.py my_audio.mp3 output_filename
-    if len(sys.argv) > 1:
-        json_path, csv_path, lyrics_txt = transcribe_to_structured_data(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "output")
+    # Usage: python script.py my_audio.mp3 output_dir output_filename
+    if len(sys.argv) > 2:
+        output_dir = sys.argv[2]
+        output_name = sys.argv[3] if len(sys.argv) > 3 else "output"
+        json_path, csv_path, lyrics_txt = transcribe_to_structured_data(sys.argv[1], output_dir, output_name)
     else:
-        print("Please provide an audio file path.")
+        print("Please provide an audio file path and output directory.")

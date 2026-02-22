@@ -50,39 +50,30 @@ def transcribe_audio_endpoint():
     if file.filename == '':
         return jsonify({'music_file': ['No selected file.']}), 400
     
-    if file: #and allowed_file(file.filename):
-        filename = file.filename # secure_filename(file.filename)
-        os.makedirs('uploads', exist_ok=True) # Ensure uploads directory exists
-        file.save(os.path.join('uploads', filename))
-        input_path = os.path.join('uploads', filename)
-    else:
-        return jsonify({'music_file': ['Invalid file type.']}), 400
-
-    # Output directory shared_data/outputs/<filename_no_ext>
-    # base_filename = input_path.stem
-    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "shared_data" / "outputs" / filename
+    # Output directory shared_data/outputs/<song_id>
+    output_dir_str = request.form.get('output_dir')
+    if not output_dir_str:
+        return jsonify({'error': 'Missing output_dir in form data'}), 400
+        
+    output_dir = Path(output_dir_str)
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    if file: #and allowed_file(file.filename):
+        filename = file.filename # secure_filename(file.filename)
+        input_path = os.path.join(output_dir, filename)
+        file.save(input_path)
+    else:
+        return jsonify({'music_file': ['Invalid file type.']}), 400
+    
     try:
-        
         target_output_subdir = filename
-        # Pass the file path (string), not the file object
-        json_file, csv_file, lyrics_txt = transcribe_to_structured_data(input_path, target_output_subdir)
+        # Pass the file path (string) and output directory, not the file object
+        json_file, csv_file, lyrics_txt = transcribe_to_structured_data(input_path, output_dir, target_output_subdir)
         
         print("result:")
         print(json_file)
         print(csv_file)
         print(lyrics_txt)
-
-        # Expected locations:
-        # output/<target_output_subdir>/vocals.wav
-        # output/<target_output_subdir>/instrumental.wav
-        
-        # Move to shared_data/outputs/<base_filename>
-        # ensure output_dir exists
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        src_dir = Path("output") / target_output_subdir
 
         import json
         with open(json_file, 'r', encoding='utf-8') as f:

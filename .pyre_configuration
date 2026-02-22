@@ -1,0 +1,17 @@
+{
+  "source_directories": [
+    "music-separation-svr",
+    "queueing-proxy-svr",
+    "scripts",
+    "transcription_svr"
+  ],
+  "site_roots": [
+    ".venv",
+    ".venv/Lib/site-packages"
+  ],
+  "exclude": [
+    ".venv/.*",
+    ".venv.bak/.*"
+  ],
+  "site_package_search_strategy": "pep561"
+}
